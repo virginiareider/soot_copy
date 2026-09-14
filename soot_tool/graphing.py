@@ -66,14 +66,40 @@ def build_profile(
         raise ValueError("poly_order must be > 0.")
     if window <= 0:
         raise ValueError("window must be > 0.")
-    
+
     cleaned = clean_data(df, y_col=y_col, x_col=x_col)
 
     cleaned = cleaned.copy()
 
     profile = cleaned
-    
+
     return cleaned, profile
+
+
+def _get_valid_savgol_window(size: int, window: int, poly_order: int) -> int | None:
+    if size < 3:
+        return None
+
+    max_window = size if size % 2 == 1 else size - 1
+    if max_window < 3:
+        return None
+
+    if window > max_window:
+        window = max_window
+
+    if window % 2 == 0:
+        window -= 1
+
+    if window <= poly_order:
+        candidate = poly_order + 1
+        if candidate % 2 == 0:
+            candidate += 1
+        if candidate > max_window:
+            return None
+        window = candidate
+
+    return window
+
 
 def make_plot(
     cleaned: pd.DataFrame,
@@ -99,40 +125,43 @@ def make_plot(
         ax.scatter(
             cleaned[x_col],
             cleaned[y_col],
-            s=7,
-            alpha=0.10,
-            linewidths=0,
-            color="#6f7478",
+            s=18,
+            alpha=0.55,
+            linewidths=0.4,
+            color="#3c4043",
             label="Raw",
         )
 
     if show_smoothed:
-        if smooth_vertical:
-            profile = profile.sort_values(by=y_col)
-            y = profile[y_col]
-            x = profile[x_col]
-            smoothed = savgol_filter(x, window_length=window, polyorder=poly_order)
-            
-            ax.plot(
-                smoothed,
-                y,
-                linewidth=2,
-                color="#d62728",
-                label="Smoothed (Vertically)",
-            )
-        else:
-            profile = profile.sort_values(by = x_col)
-            y = profile[y_col]
-            x = profile[x_col]
-            smoothed = savgol_filter(y, window_length=window, polyorder=poly_order)
-        
-            ax.plot(
-                x,
-                smoothed,
-                linewidth=2,
-                color="#d62728",
-                label=f"Smoothed (Horizontally)",
-            )
+        valid_window = _get_valid_savgol_window(len(profile), window, poly_order)
+
+        if valid_window is not None:
+            if smooth_vertical:
+                profile = profile.sort_values(by=y_col)
+                y = profile[y_col]
+                x = profile[x_col]
+                smoothed = savgol_filter(x, window_length=valid_window, polyorder=poly_order)
+
+                ax.plot(
+                    smoothed,
+                    y,
+                    linewidth=2,
+                    color="#d62728",
+                    label="Smoothed (Vertically)",
+                )
+            else:
+                profile = profile.sort_values(by=x_col)
+                y = profile[y_col]
+                x = profile[x_col]
+                smoothed = savgol_filter(y, window_length=valid_window, polyorder=poly_order)
+
+                ax.plot(
+                    x,
+                    smoothed,
+                    linewidth=2,
+                    color="#d62728",
+                    label=f"Smoothed (Horizontally)",
+                )
             
     ax.set_title(title)
     ax.set_xlabel(f"{x_col}")

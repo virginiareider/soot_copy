@@ -1,311 +1,174 @@
-import tempfile
 from pathlib import Path
+import re
 
 import pandas as pd
 import streamlit as st
 
 from soot_tool.graphing import build_figure
-from soot_tool.auth import session_from_token, assert_authorized
-from soot_tool.soot_api import (
-    get_campaigns,
-    get_years,
-    get_platforms,
-    get_pis,
-    get_filenames,
-)
-from soot_tool.pipeline import run_download_convert
 
-@st.cache_data(show_spinner=False)
-def load_graph_df(df: pd.DataFrame) -> pd.DataFrame:
-    return df
+st.set_page_config(page_title="City / Season Dataset Explorer", layout="wide")
 
-@st.cache_resource(show_spinner="Authenticating with NASA Earthdata...")
-def get_session(token: str) -> "requests.Session":
-    session = session_from_token(token)
-    assert_authorized(session)
-    return session
-
-# ------------------------------------------------------------
-# Graphing capabilities
-# ------------------------------------------------------------
-def render_graph_page() -> None:
-    st.title("Graph")
-    st.write(f"This graph is generated from {st.session_state['download_filename']}. Error bars on the smoothed graph cannot be "
-             f"provided because there is no closed-form solution for these standard errors and bootstrapping to estimate standard " 
-             f"errors would slow down the app to make it unusable. For the scope of this project, smoothing is done with a Savitzky–Golay " 
-             f"filter, which is best used for evenly spaced data. This data is not always evenly spaced, but due to time constraints, "
-             f"this smoothing technique was sufficient. Please note this as you analyze smoothed graphs.")
-
-    if st.button("← Back to Download Page"):
-        st.session_state["page"] = "download"
-        st.rerun()
-    
-    if ("download_full_df" not in st.session_state or st.session_state["download_full_df"] is None):
-        st.error("No data loaded. Please try again.")
-        st.stop()
-
-    graph_df = load_graph_df(st.session_state["download_full_df"])
-
-    graph_cols = sorted(graph_df.columns.astype(str).unique())
-    
-    y_axis = st.selectbox(
-        "Y Axis Variable",
-        graph_cols,
-    )
-    x_axis = st.selectbox(
-        "X Axis Variable",
-        graph_cols,
-    )
-
-    st.sidebar.header("Graph Controls")
-    
-    poly_order = st.sidebar.slider(
-        "Polynomial Order",
-        min_value=1,
-        max_value=6,
-        value=3,
-        step=1,
-        key="graph_poly_order",
-    )
-    
-    window = st.sidebar.slider(
-        "Rolling Window (Number of Points)",
-        min_value=3,
-        max_value=400,
-        value=100,
-        step=1,
-        key="graph_window",
-    )
-    
-    show_raw = st.sidebar.checkbox(
-        "Show Raw Scatter",
-        value=True,
-        key="graph_show_raw",
-    )
-
-    show_smoothed = st.sidebar.checkbox(
-        "Show Smoothed Graph",
-        value=True,
-        key="graph_show_smoothed",
-    )
-
-    smooth_vertical = st.sidebar.checkbox(
-        "Smooth Vertically", 
-        value = False,
-        key = "graph_smooth_vertical"
-    )
-
-    reverse_vertical = st.sidebar.checkbox(
-        "Reverse Y-Axis", 
-        value = False,
-        key = "graph_reverse_vertical"
-    )
-
-    try:
-        st.caption(
-            f"Using {len(graph_df):,} rows from {st.session_state['download_filename']} "
-            f"| Columns: {', '.join(graph_df.columns.astype(str))}"
-        )
-
-        fig = build_figure(
-            graph_df,
-            y_col=y_axis,
-            x_col=x_axis,
-            poly_order = poly_order,
-            window = window,
-            show_raw=show_raw,
-            show_smoothed=show_smoothed,
-            smooth_vertical = smooth_vertical,
-            reverse_vertical = reverse_vertical,
-            title=f"{x_axis} vs {y_axis} \n (From {st.session_state['download_filename']})",
-        )
-
-        st.pyplot(fig)
-
-    except Exception as e:
-        st.warning(f"Could not build graph from {st.session_state["download_filename"]}: {e}")
-
-    st.set_page_config(page_title="NASA SOOT ICARTT Converter", layout="wide")
-
-
-# ------------------------------------------------------------
-# Session state defaults
-# ------------------------------------------------------------
-defaults = {
-    "page": "download",
-    "download_complete": False,
-    "download_csv_bytes": None,
-    "download_filename": None,
-    "download_preview_df": None,
-    "download_full_df": None,
-    "download_summary": None,
-    "saved_username": "",
-    "saved_password": "",
-    "selected_campaign": None,
-    "selected_year": None,
-    "selected_platform": None,
-    "selected_pi_lastname": None,
+DATASET_DIR = Path("datasets")
+SEASON_ALIASES = {
+    "spring": "spring",
+    "summer": "summer",
+    "autumn": "autumn",
+    "fall": "fall",
+    "winter": "winter",
 }
 
-for key, value in defaults.items():
-    if key not in st.session_state:
-        st.session_state[key] = value
+
+def normalize_text(value: str) -> str:
+    return re.sub(r"[_\-\s]+", " ", str(value).strip()).strip().lower()
 
 
-# ------------------------------------------------------------
-# Graph page
-# ------------------------------------------------------------
-if st.session_state["page"] == "graph":
-    render_graph_page()
-    st.stop()
+def infer_dataset_metadata(dataset_path: Path) -> dict[str, str]:
+    stem = dataset_path.stem
+    stem_tokens = [token for token in re.split(r"[_\-\s]+", stem) if token]
 
-# ------------------------------------------------------------
-# Download page
-# ------------------------------------------------------------
-st.set_page_config(page_title="NASA SOOT ICARTT Converter", layout="wide")
-st.title("NASA SOOT — ICARTT Downloader + CSV Converter")
+    season = "unknown"
+    for token in reversed(stem_tokens):
+        token_norm = normalize_text(token)
+        if token_norm in SEASON_ALIASES:
+            season = SEASON_ALIASES[token_norm]
+            stem_tokens = stem_tokens[: stem_tokens.index(token)]
+            break
 
-st.write("Enter your NASA Earthdata Bearer Token to authorize downloads.")
-st.markdown(
-    "1. Log in at [urs.earthdata.nasa.gov](https://urs.earthdata.nasa.gov)\n"
-    "2. Click **Generate Token** from the top-right menu\n"
-    "3. Click **Show Token**, copy it, and paste it below\n\n"
-    "_Tokens are valid for 60 days and can be revoked at any time._"
+    if stem_tokens:
+        city = " ".join(stem_tokens).strip()
+    else:
+        city = dataset_path.parent.name
+
+    city = city.title() if city else dataset_path.parent.name.title()
+    season = season.title() if season != "unknown" else "Unknown"
+
+    return {
+        "path": dataset_path,
+        "city": city,
+        "season": season,
+        "dataset_name": dataset_path.name,
+    }
+
+
+@st.cache_data(show_spinner=False)
+def load_dataset(dataset_path: Path) -> pd.DataFrame:
+    return pd.read_csv(dataset_path)
+
+
+@st.cache_data(show_spinner=False)
+def list_datasets() -> list[dict[str, str]]:
+    if not DATASET_DIR.exists():
+        DATASET_DIR.mkdir(parents=True, exist_ok=True)
+
+    dataset_files = sorted(DATASET_DIR.rglob("*.csv"))
+    return [infer_dataset_metadata(path) for path in dataset_files]
+
+
+@st.cache_data(show_spinner=False)
+def resolve_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
+    lowered = {str(col).strip().lower(): col for col in df.columns}
+    for candidate in candidates:
+        key = candidate.strip().lower()
+        if key in lowered:
+            return lowered[key]
+    return None
+
+
+st.title("City / Season Dataset Explorer")
+st.write(
+    "Place your CSV datasets in the datasets folder. The app will auto-discover them and let you choose the city and season."
 )
 
-user_token = st.text_input(
-    "Earthdata Bearer Token",
-    type="password",
-    placeholder="Paste your token here...",
-)
+all_datasets = list_datasets()
 
-if not user_token:
-    st.stop()
-
-try:
-    session = get_session(user_token)
-    st.success("Authorized ✅")
-except Exception as e:
-    st.error(str(e))
-    st.stop()
-    
-# ------------------------------------------------------------
-# Campaign selection
-# ------------------------------------------------------------
-with st.spinner("Loading campaigns..."):
-    campaigns_df = get_campaigns(session)
-
-campaign_col = "acronym" if "acronym" in campaigns_df.columns else campaigns_df.columns[0]
-campaign_options = sorted(campaigns_df[campaign_col].astype(str).unique())
-
-if st.session_state["selected_campaign"] not in campaign_options:
-    st.session_state["selected_campaign"] = campaign_options[0]
-
-campaign = st.selectbox(
-    "Campaign",
-    campaign_options,
-    index=campaign_options.index(st.session_state["selected_campaign"]),
-)
-st.session_state["selected_campaign"] = campaign
-
-with st.spinner("Loading years..."):
-    years_df = get_years(session, campaign)
-
-year_col = "year" if "year" in years_df.columns else years_df.columns[0]
-year_options = sorted(years_df[year_col].astype(str).unique())
-
-if st.session_state["selected_year"] not in year_options:
-    st.session_state["selected_year"] = year_options[0]
-
-year = st.selectbox(
-    "Year",
-    year_options,
-    index=year_options.index(st.session_state["selected_year"]),
-)
-st.session_state["selected_year"] = year
-
-with st.spinner("Loading platforms..."):
-    platforms_df = get_platforms(session, campaign, year)
-
-platform_col = "name" if "name" in platforms_df.columns else platforms_df.columns[0]
-platform_options = sorted(platforms_df[platform_col].astype(str).unique())
-
-if st.session_state["selected_platform"] not in platform_options:
-    st.session_state["selected_platform"] = platform_options[0]
-
-platform = st.selectbox(
-    "Platform",
-    platform_options,
-    index=platform_options.index(st.session_state["selected_platform"]),
-)
-st.session_state["selected_platform"] = platform
-
-with st.spinner("Loading PIs..."):
-    pis_df = get_pis(session, campaign, year, platform)
-
-pi_col = "lastname" if "lastname" in pis_df.columns else pis_df.columns[0]
-pi_options = sorted(pis_df[pi_col].astype(str).unique())
-
-if st.session_state["selected_pi_lastname"] not in pi_options:
-    st.session_state["selected_pi_lastname"] = pi_options[0]
-
-pi_lastname = st.selectbox(
-    "PI Last Name",
-    pi_options,
-    index=pi_options.index(st.session_state["selected_pi_lastname"]),
-)
-st.session_state["selected_pi_lastname"] = pi_lastname
-
-# ------------------------------------------------------------
-# Filename preview
-# ------------------------------------------------------------
-with st.spinner("Fetching filenames..."):
-    fn_df = get_filenames(session, campaign, year, platform, pi_lastname)
-
-if "filename" not in fn_df.columns:
-    st.error("Filename response missing 'filename' column.")
-    st.stop()
-
-filenames = fn_df["filename"].dropna().astype(str).tolist()
-st.write(f"Files available: **{len(filenames)}**")
-st.dataframe(fn_df.head(200), use_container_width=True)
-
-# ------------------------------------------------------------
-# Download + convert
-# ------------------------------------------------------------
-if st.button("Download + Convert", type="primary"):
-    with tempfile.TemporaryDirectory() as tmp:
-        workdir = Path(tmp)
-
-        with st.spinner("Downloading, extracting, parsing..."):
-            result = run_download_convert(session, filenames, workdir, cleanup_ict=True)
-
-        st.session_state["download_complete"] = True
-        st.session_state["download_csv_bytes"] = result.df.to_csv(index=False).encode("utf-8")
-        st.session_state["download_filename"] = (
-            f"{campaign}_{year}_{platform}_{pi_lastname}.csv"
-        )
-        st.session_state["download_preview_df"] = result.df.head(200)
-        st.session_state["download_full_df"] = result.df
-        st.session_state["download_summary"] = (
-            f"Done. Rows: {result.rows:,} | Columns: {result.cols:,}"
-        )
-
-
-# ------------------------------------------------------------
-# Show download results if available
-# ------------------------------------------------------------
-if st.session_state["download_complete"]:
-    st.success(st.session_state["download_summary"])
-    st.dataframe(st.session_state["download_preview_df"], use_container_width=True)
-
-    st.download_button(
-        "Download CSV",
-        data=st.session_state["download_csv_bytes"],
-        file_name=st.session_state["download_filename"],
-        mime="text/csv",
+if not all_datasets:
+    st.warning(
+        "No CSV datasets were found in the datasets folder yet. Add CSV files named like 'boston_spring.csv' or 'boston-spring.csv'."
     )
+    st.stop()
 
-    if st.button("Show Graph"):
-        st.session_state["page"] = "graph"
-        st.rerun()
+cities = sorted({item["city"] for item in all_datasets})
+city = st.selectbox("City", cities)
+
+city_datasets = [item for item in all_datasets if item["city"] == city]
+seasons = sorted({item["season"] for item in city_datasets})
+season = st.selectbox("Season", seasons)
+
+season_datasets = [item for item in city_datasets if item["season"] == season]
+
+if len(season_datasets) == 1:
+    selected_dataset = season_datasets[0]
+else:
+    dataset_labels = [item["dataset_name"] for item in season_datasets]
+    selected_dataset_name = st.selectbox("Dataset", dataset_labels)
+    selected_dataset = next(item for item in season_datasets if item["dataset_name"] == selected_dataset_name)
+
+st.caption(f"Loading: {selected_dataset['dataset_name']}")
+
+with st.spinner("Loading dataset..."):
+    dataset_df = load_dataset(selected_dataset["path"])
+
+st.dataframe(dataset_df.head(200), use_container_width=True)
+
+altitude_col = resolve_col(
+    dataset_df,
+    ["Altitude_m_MSL", "Altitude_m", "Altitude", "altitude", "altitude_msl"],
+)
+ozone_col = resolve_col(
+    dataset_df,
+    ["Ozone_ppbv", "O3_ppbv", "Ozone", "ozone", "ozone_ppbv"],
+)
+temp_col = resolve_col(
+    dataset_df,
+    ["Temperature_C", "Temp_C", "Temperature", "Temp", "temp", "air_temperature"],
+)
+
+if altitude_col is None:
+    st.error("This dataset does not contain an altitude column. Expected one of: Altitude_m_MSL, Altitude_m, Altitude.")
+    st.stop()
+
+if ozone_col is None:
+    st.error("This dataset does not contain an ozone column. Expected one of: Ozone_ppbv, O3_ppbv, Ozone.")
+    st.stop()
+
+if temp_col is None:
+    st.warning("No temperature column was detected. Plotting ozone vs altitude only.")
+
+st.sidebar.header("Graph Controls")
+poly_order = st.sidebar.slider("Polynomial Order", min_value=1, max_value=6, value=3, step=1)
+window = st.sidebar.slider("Rolling Window (Number of Points)", min_value=3, max_value=400, value=100, step=1)
+show_raw = st.sidebar.checkbox("Show Raw Scatter", value=True)
+show_smoothed = st.sidebar.checkbox("Show Smoothed Graph", value=True)
+smooth_vertical = st.sidebar.checkbox("Smooth Vertically", value=False)
+reverse_vertical = st.sidebar.checkbox("Reverse Y-Axis", value=False)
+
+st.subheader("Ozone vs Altitude")
+fig_ozone = build_figure(
+    dataset_df,
+    y_col=altitude_col,
+    x_col=ozone_col,
+    poly_order=poly_order,
+    window=window,
+    show_raw=show_raw,
+    show_smoothed=show_smoothed,
+    smooth_vertical=smooth_vertical,
+    reverse_vertical=reverse_vertical,
+    title=f"Ozone vs Altitude — {city} ({season})",
+)
+st.pyplot(fig_ozone)
+
+if temp_col is not None:
+    st.subheader("Temperature vs Altitude")
+    fig_temp = build_figure(
+        dataset_df,
+        y_col=altitude_col,
+        x_col=temp_col,
+        poly_order=poly_order,
+        window=window,
+        show_raw=show_raw,
+        show_smoothed=show_smoothed,
+        smooth_vertical=smooth_vertical,
+        reverse_vertical=reverse_vertical,
+        title=f"Temperature vs Altitude — {city} ({season})",
+    )
+    st.pyplot(fig_temp)
