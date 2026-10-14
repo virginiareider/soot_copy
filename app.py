@@ -1,53 +1,52 @@
 from pathlib import Path
-import re
 
 import pandas as pd
 import streamlit as st
 
-from soot_tool.graphing import build_figure
+from visualizations.common import smooth_by_altitude
+from visualizations.profile_plot import create_profile_figure
+from visualizations.scatter_plot import (
+    create_ozone_scatter_figure,
+    create_temperature_scatter_figure,
+)
+from visualizations.violin_plot import create_violin_figure
 
-st.set_page_config(page_title="City / Season Dataset Explorer", layout="wide")
+st.set_page_config(page_title="NASA Ozone Profiles", layout="wide")
 
-DATASET_DIR = Path("datasets")
-SEASON_ALIASES = {
-    "spring": "spring",
-    "summer": "summer",
-    "autumn": "autumn",
-    "fall": "fall",
-    "winter": "winter",
-}
-
-
-def normalize_text(value: str) -> str:
-    return re.sub(r"[_\-\s]+", " ", str(value).strip()).strip().lower()
-
-
-def infer_dataset_metadata(dataset_path: Path) -> dict[str, str]:
-    stem = dataset_path.stem
-    stem_tokens = [token for token in re.split(r"[_\-\s]+", stem) if token]
-
-    season = "unknown"
-    for token in reversed(stem_tokens):
-        token_norm = normalize_text(token)
-        if token_norm in SEASON_ALIASES:
-            season = SEASON_ALIASES[token_norm]
-            stem_tokens = stem_tokens[: stem_tokens.index(token)]
-            break
-
-    if stem_tokens:
-        city = " ".join(stem_tokens).strip()
-    else:
-        city = dataset_path.parent.name
-
-    city = city.title() if city else dataset_path.parent.name.title()
-    season = season.title() if season != "unknown" else "Unknown"
-
-    return {
-        "path": dataset_path,
-        "city": city,
-        "season": season,
-        "dataset_name": dataset_path.name,
-    }
+PROJECT_DIR = Path(__file__).resolve().parent
+PROCESSED_DIR = PROJECT_DIR / "datasets" / "processed"
+CAMPAIGNS = [
+    {
+        "location": "Chesapeake Bay region",
+        "season": "Summer",
+        "label": "OWLETS 2017 · Sonde",
+        "stem": "OWLETS_2017_SONDE_MCGEE",
+    },
+    {
+        "location": "Louisiana Gulf Coast",
+        "season": "Summer",
+        "label": "SCOAPE 2024 · Sonde",
+        "stem": "SCOAPE_2024_SONDE_STAUFFER",
+    },
+    {
+        "location": "North Atlantic",
+        "season": "Summer",
+        "label": "AJAX 2018 · Alpha",
+        "stem": "AJAX_2018_ALPHA_IRACI",
+    },
+    {
+        "location": "Lake Michigan",
+        "season": "Summer",
+        "label": "LMOS 2017 · SCI-AVIATION",
+        "stem": "LMOS_2017_SCI-AVIATION_CONLEY",
+    },
+    {
+        "location": "Maryland",
+        "season": "Summer",
+        "label": "Discover-AQ 2011 · Maryland",
+        "stem": "DISCOVERAQ_2011-MD_MERGE_MRG",
+    },
+]
 
 
 @st.cache_data(show_spinner=False)
@@ -55,120 +54,229 @@ def load_dataset(dataset_path: Path) -> pd.DataFrame:
     return pd.read_csv(dataset_path)
 
 
-@st.cache_data(show_spinner=False)
-def list_datasets() -> list[dict[str, str]]:
-    if not DATASET_DIR.exists():
-        DATASET_DIR.mkdir(parents=True, exist_ok=True)
+st.title("NASA Ozone and Temperature Profiles")
 
-    dataset_files = sorted(DATASET_DIR.rglob("*.csv"))
-    return [infer_dataset_metadata(path) for path in dataset_files]
-
-
-@st.cache_data(show_spinner=False)
-def resolve_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
-    lowered = {str(col).strip().lower(): col for col in df.columns}
-    for candidate in candidates:
-        key = candidate.strip().lower()
-        if key in lowered:
-            return lowered[key]
-    return None
-
-
-st.title("City / Season Dataset Explorer")
-st.write(
-    "Place your CSV datasets in the datasets folder. The app will auto-discover them and let you choose the city and season."
-)
-
-all_datasets = list_datasets()
-
-if not all_datasets:
-    st.warning(
-        "No CSV datasets were found in the datasets folder yet. Add CSV files named like 'boston_spring.csv' or 'boston-spring.csv'."
+available_campaigns = [
+    campaign
+    for campaign in CAMPAIGNS
+    if all(
+        (PROCESSED_DIR / folder / f"{campaign['stem']}_avg_{bin_size}m.csv").exists()
+        for folder, bin_size in (
+            ("averaged_10m", 10),
+            ("averaged_50m", 50),
+            ("averaged_100m", 100),
+            ("averaged_500m", 500),
+        )
     )
+]
+
+if not available_campaigns:
+    st.warning("No processed campaign profiles were found. Run `python process_datasets.py` first.")
     st.stop()
 
-cities = sorted({item["city"] for item in all_datasets})
-city = st.selectbox("City", cities)
+locations = sorted({campaign["location"] for campaign in available_campaigns})
+location = st.selectbox("Location", locations)
 
-city_datasets = [item for item in all_datasets if item["city"] == city]
-seasons = sorted({item["season"] for item in city_datasets})
+location_campaigns = [
+    campaign for campaign in available_campaigns if campaign["location"] == location
+]
+seasons = sorted({campaign["season"] for campaign in location_campaigns})
 season = st.selectbox("Season", seasons)
 
-season_datasets = [item for item in city_datasets if item["season"] == season]
-
-if len(season_datasets) == 1:
-    selected_dataset = season_datasets[0]
-else:
-    dataset_labels = [item["dataset_name"] for item in season_datasets]
-    selected_dataset_name = st.selectbox("Dataset", dataset_labels)
-    selected_dataset = next(item for item in season_datasets if item["dataset_name"] == selected_dataset_name)
-
-st.caption(f"Loading: {selected_dataset['dataset_name']}")
-
-with st.spinner("Loading dataset..."):
-    dataset_df = load_dataset(selected_dataset["path"])
-
-st.dataframe(dataset_df.head(200), use_container_width=True)
-
-altitude_col = resolve_col(
-    dataset_df,
-    ["Altitude_m_MSL", "Altitude_m", "Altitude", "altitude", "altitude_msl"],
+season_campaigns = [
+    campaign for campaign in location_campaigns if campaign["season"] == season
+]
+selected_label = st.selectbox(
+    "Dataset",
+    [campaign["label"] for campaign in season_campaigns],
 )
-ozone_col = resolve_col(
-    dataset_df,
-    ["Ozone_ppbv", "O3_ppbv", "Ozone", "ozone", "ozone_ppbv"],
+selected_campaign = next(
+    campaign for campaign in season_campaigns if campaign["label"] == selected_label
 )
-temp_col = resolve_col(
-    dataset_df,
-    ["Temperature_C", "Temp_C", "Temperature", "Temp", "temp", "air_temperature"],
+resolution = st.selectbox("Altitude interval", ["10 m", "50 m", "100 m", "500 m"], index=1)
+bin_size_m = int(resolution.split()[0])
+average_folder = f"averaged_{bin_size_m}m"
+dataset_path = (
+    PROCESSED_DIR
+    / average_folder
+    / f"{selected_campaign['stem']}_avg_{bin_size_m}m.csv"
 )
 
-if altitude_col is None:
-    st.error("This dataset does not contain an altitude column. Expected one of: Altitude_m_MSL, Altitude_m, Altitude.")
+with st.spinner("Loading averaged profile..."):
+    profile = load_dataset(dataset_path)
+
+required_columns = ["Altitude_km", "Ozone_ppmv"]
+has_temperature = "Air_Temperature_C" in profile.columns
+if not set(required_columns).issubset(profile.columns):
+    st.error(f"The selected profile is missing required columns: {required_columns}.")
     st.stop()
 
-if ozone_col is None:
-    st.error("This dataset does not contain an ozone column. Expected one of: Ozone_ppbv, O3_ppbv, Ozone.")
-    st.stop()
-
-if temp_col is None:
-    st.warning("No temperature column was detected. Plotting ozone vs altitude only.")
-
-st.sidebar.header("Graph Controls")
-poly_order = st.sidebar.slider("Polynomial Order", min_value=1, max_value=6, value=3, step=1)
-window = st.sidebar.slider("Rolling Window (Number of Points)", min_value=3, max_value=400, value=100, step=1)
-show_raw = st.sidebar.checkbox("Show Raw Scatter", value=True)
-show_smoothed = st.sidebar.checkbox("Show Smoothed Graph", value=True)
-smooth_vertical = st.sidebar.checkbox("Smooth Vertically", value=False)
-reverse_vertical = st.sidebar.checkbox("Reverse Y-Axis", value=False)
-
-st.subheader("Ozone vs Altitude")
-fig_ozone = build_figure(
-    dataset_df,
-    y_col=altitude_col,
-    x_col=ozone_col,
-    poly_order=poly_order,
-    window=window,
-    show_raw=show_raw,
-    show_smoothed=show_smoothed,
-    smooth_vertical=smooth_vertical,
-    reverse_vertical=reverse_vertical,
-    title=f"Ozone vs Altitude — {city} ({season})",
+st.caption(f"{selected_campaign['label']} · {location} · {season} · {resolution} bins")
+st.caption(
+    "Dashed tropopause boundary separates the troposphere below from the stratosphere above. "
+    "Its height is adjustable because the real tropopause varies."
 )
-st.pyplot(fig_ozone)
 
-if temp_col is not None:
-    st.subheader("Temperature vs Altitude")
-    fig_temp = build_figure(
-        dataset_df,
-        y_col=altitude_col,
-        x_col=temp_col,
-        poly_order=poly_order,
-        window=window,
-        show_raw=show_raw,
-        show_smoothed=show_smoothed,
-        smooth_vertical=smooth_vertical,
-        reverse_vertical=reverse_vertical,
-        title=f"Temperature vs Altitude — {city} ({season})",
+maximum_smoothing_m = max(100, min(2000, int(profile["Altitude_km"].max() * 1000)))
+maximum_smoothing_m = max(100, (maximum_smoothing_m // 100) * 100)
+with st.sidebar:
+    st.subheader("Profile style")
+    show_bin_means = st.checkbox("Show altitude-bin means", value=True)
+    show_smooth_curve = st.checkbox("Show smoothed curve", value=True)
+    smoothing_span_m = st.slider(
+        "Smoothing span (m)",
+        min_value=100,
+        max_value=maximum_smoothing_m,
+        value=min(500, maximum_smoothing_m),
+        step=100,
     )
-    st.pyplot(fig_temp)
+    color_palette = [
+        "Teal", "Blue", "Green", "Orange", "Red", "Purple", "Brown", "Black",
+    ]
+    ozone_color = st.selectbox("Ozone point color", color_palette, index=0)
+    temperature_color = st.selectbox("Temperature point color", color_palette, index=3)
+    line_color = st.selectbox("Smooth line color", color_palette, index=1)
+    marker_shape = st.selectbox(
+        "Data marker shape",
+        ["circle", "square", "diamond", "triangle", "cross", "x", "star"],
+    )
+    marker_size = st.slider("Data marker size", min_value=3, max_value=14, value=6)
+    curve_style = st.selectbox("Smooth curve style", ["solid", "dash", "dot", "dashdot"])
+    reverse_altitude = st.checkbox("Reverse altitude axis", value=False)
+    show_tropopause = st.checkbox("Show tropopause boundary", value=True)
+    tropopause_km = st.number_input(
+        "Tropopause altitude (km)",
+        min_value=5.0,
+        max_value=20.0,
+        value=12.0,
+        step=0.5,
+        disabled=not show_tropopause,
+    )
+
+altitude_min = float(profile["Altitude_km"].min())
+altitude_max = float(profile["Altitude_km"].max())
+ozone_min = float(profile["Ozone_ppmv"].min())
+ozone_max = float(profile["Ozone_ppmv"].max())
+
+temperature_limits = None
+if has_temperature:
+    temperature_min = float(profile["Air_Temperature_C"].min())
+    temperature_max = float(profile["Air_Temperature_C"].max())
+
+with st.expander("Axis ranges", expanded=False):
+    altitude_range, ozone_range = st.columns(2)
+    altitude_limits = altitude_range.slider(
+        "Altitude (km)",
+        min_value=altitude_min,
+        max_value=altitude_max,
+        value=(altitude_min, altitude_max),
+        step=max(bin_size_m / 1000, 0.001),
+        format="%.3f",
+    )
+    ozone_limits = ozone_range.slider(
+        "Ozone (ppmv)",
+        min_value=ozone_min,
+        max_value=ozone_max,
+        value=(ozone_min, ozone_max),
+        step=max((ozone_max - ozone_min) / 500, 0.00001),
+        format="%.4f",
+    )
+    if has_temperature:
+        temperature_range = st.columns(1)[0]
+        temperature_limits = temperature_range.slider(
+            "Air temperature (°C)",
+            min_value=temperature_min,
+            max_value=temperature_max,
+            value=(temperature_min, temperature_max),
+            step=max((temperature_max - temperature_min) / 500, 0.01),
+            format="%.1f",
+        )
+
+visible_profile = profile.loc[
+    profile["Altitude_km"].between(*altitude_limits)
+].sort_values("Altitude_km")
+if visible_profile.empty:
+    st.warning("No altitude-bin averages fall within the selected altitude range.")
+    st.stop()
+
+tab_labels = [
+    "Profiles",
+    "Overall violins",
+    "Ozone vs altitude",
+]
+if has_temperature:
+    tab_labels.append("Temperature vs altitude")
+tabs = st.tabs(tab_labels)
+
+with tabs[0]:
+    figure = create_profile_figure(
+        visible_profile,
+        ozone_limits,
+        temperature_limits,
+        altitude_limits,
+        ozone_color,
+        temperature_color,
+        line_color,
+        marker_shape,
+        marker_size,
+        curve_style,
+        smoothing_span_m,
+        reverse_altitude,
+        show_bin_means,
+        show_smooth_curve,
+        show_tropopause,
+        tropopause_km,
+        selected_campaign["label"],
+        resolution,
+        has_temperature,
+    )
+    st.plotly_chart(figure, width="stretch", config={"scrollZoom": True, "displaylogo": False})
+
+with tabs[1]:
+    st.caption("Each violin shows the distribution of altitude-bin means for that variable.")
+    figure = create_violin_figure(
+        visible_profile,
+        altitude_limits,
+        ozone_limits,
+        temperature_limits,
+        ozone_color,
+        temperature_color,
+        show_tropopause,
+        tropopause_km,
+        has_temperature,
+    )
+    st.plotly_chart(figure, width="stretch", config={"scrollZoom": True, "displaylogo": False})
+
+with tabs[2]:
+    figure = create_ozone_scatter_figure(
+        visible_profile,
+        altitude_limits,
+        ozone_limits,
+        temperature_limits,
+        marker_shape,
+        marker_size,
+        reverse_altitude,
+        "Linear",
+        show_tropopause,
+        tropopause_km,
+        has_temperature,
+    )
+    st.plotly_chart(figure, width="stretch", config={"scrollZoom": True, "displaylogo": False})
+
+if has_temperature:
+    with tabs[3]:
+        figure = create_temperature_scatter_figure(
+            visible_profile,
+            altitude_limits,
+            ozone_limits,
+            temperature_limits,
+            marker_shape,
+            marker_size,
+            reverse_altitude,
+            show_tropopause,
+            tropopause_km,
+        )
+        st.plotly_chart(figure, width="stretch", config={"scrollZoom": True, "displaylogo": False})
+
+with st.expander("Averaged profile data"):
+    st.dataframe(visible_profile, width="stretch", hide_index=True)
