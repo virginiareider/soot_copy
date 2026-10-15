@@ -59,24 +59,6 @@ def create_violin_figure(
             col=3,
         )
         figure.update_yaxes(title_text="°C", range=list(temperature_limits), row=1, col=3)
-        figure.add_trace(
-            go.Violin(
-                x=[label] * len(values),
-                y=values,
-                name=label,
-                box_visible=True,
-                meanline_visible=True,
-                points=False,
-                fillcolor=color,
-                opacity=0.55,
-                line_color=color,
-                hovertemplate=f"{label}: %{{y:.4g}} {units}<extra></extra>",
-                showlegend=False,
-            ),
-            row=1,
-            col=column_index,
-        )
-        figure.update_yaxes(title_text=units, range=list(limits), row=1, col=column_index)
     if show_tropopause and altitude_limits[0] <= tropopause_km <= altitude_limits[1]:
         figure.add_hline(
             y=tropopause_km,

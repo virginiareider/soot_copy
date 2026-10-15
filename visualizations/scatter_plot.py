@@ -23,9 +23,10 @@ def create_ozone_scatter_figure(
         "cmin": ozone_limits[0],
         "cmax": ozone_limits[1],
         "colorbar": {"title": "Ozone (ppmv)"},
-        "size": marker_size + 2,
+        "size": max(3, marker_size - 2),
         "symbol": marker_shape,
-        "line": {"color": "white", "width": 0.5},
+        "opacity": 0.45,
+        "line": {"color": "white", "width": 0.35},
     }
     customdata = profile[["Sample_Count"]]
     hovertemplate = (
@@ -39,9 +40,10 @@ def create_ozone_scatter_figure(
             "cmin": temperature_limits[0],
             "cmax": temperature_limits[1],
             "colorbar": {"title": "Air temp (°C)"},
-            "size": marker_size + 2,
+            "size": max(3, marker_size - 2),
             "symbol": marker_shape,
-            "line": {"color": "white", "width": 0.5},
+            "opacity": 0.45,
+            "line": {"color": "white", "width": 0.35},
         }
         customdata = profile[["Air_Temperature_C", "Sample_Count"]]
         hovertemplate = (
@@ -50,7 +52,7 @@ def create_ozone_scatter_figure(
             "<br>Source samples: %{customdata[1]}<extra></extra>"
         )
     figure = go.Figure(
-        go.Scatter(
+        go.Scattergl(
             x=profile["Ozone_ppmv"],
             y=profile["Altitude_km"],
             mode="markers",
@@ -99,7 +101,7 @@ def create_temperature_scatter_figure(
     tropopause_km: float,
 ) -> go.Figure:
     figure = go.Figure(
-        go.Scatter(
+        go.Scattergl(
             x=profile["Air_Temperature_C"],
             y=profile["Altitude_km"],
             mode="markers",
@@ -109,9 +111,10 @@ def create_temperature_scatter_figure(
                 "cmin": ozone_limits[0],
                 "cmax": ozone_limits[1],
                 "colorbar": {"title": "Ozone (ppmv)"},
-                "size": marker_size + 2,
+                "size": max(3, marker_size - 2),
                 "symbol": marker_shape,
-                "line": {"color": "white", "width": 0.5},
+                "opacity": 0.45,
+                "line": {"color": "white", "width": 0.35},
             },
             customdata=profile[["Ozone_ppmv", "Sample_Count"]],
             hovertemplate=(

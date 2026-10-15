@@ -46,6 +46,30 @@ CAMPAIGNS = [
         "label": "Discover-AQ 2011 · Maryland",
         "stem": "DISCOVERAQ_2011-MD_MERGE_MRG",
     },
+    {
+        "location": "Multiple U.S. locations",
+        "season": "Spring-Fall 2023",
+        "label": "STAQS 2023 · Walter sonde",
+        "stem": "STAQS_2023_SONDE_WALTER",
+    },
+    {
+        "location": "Lake Michigan region",
+        "season": "Summer 2023",
+        "label": "STAQS 2023 · McKinney sonde",
+        "stem": "STAQS_2023_SONDE_MCKINNEY",
+    },
+    {
+        "location": "STAQS study region",
+        "season": "Summer 2023",
+        "label": "STAQS 2023 · Newchurch drone",
+        "stem": "STAQS_2023_DRONE_NEWCHURCH",
+    },
+    {
+        "location": "California and Nevada",
+        "season": "Spring-Summer 2019",
+        "label": "AJAX 2019 · SCI-AVIATION",
+        "stem": "AJAX_2019_SCI-AVIATION_IRACI",
+    },
 ]
 
 
@@ -75,24 +99,37 @@ if not available_campaigns:
     st.stop()
 
 locations = sorted({campaign["location"] for campaign in available_campaigns})
-location = st.selectbox("Location", locations)
-
+location_filter = st.selectbox(
+    "Location",
+    ["All locations", *locations],
+    key="location_filter_v2",
+)
 location_campaigns = [
-    campaign for campaign in available_campaigns if campaign["location"] == location
+    campaign
+    for campaign in available_campaigns
+    if location_filter == "All locations" or campaign["location"] == location_filter
 ]
 seasons = sorted({campaign["season"] for campaign in location_campaigns})
-season = st.selectbox("Season", seasons)
-
+season_filter = st.selectbox(
+    "Season",
+    ["All seasons", *seasons],
+    key="season_filter_v2",
+)
 season_campaigns = [
-    campaign for campaign in location_campaigns if campaign["season"] == season
+    campaign
+    for campaign in location_campaigns
+    if season_filter == "All seasons" or campaign["season"] == season_filter
 ]
 selected_label = st.selectbox(
     "Dataset",
     [campaign["label"] for campaign in season_campaigns],
+    key="dataset_selector_v2",
 )
 selected_campaign = next(
     campaign for campaign in season_campaigns if campaign["label"] == selected_label
 )
+location = selected_campaign["location"]
+season = selected_campaign["season"]
 resolution = st.selectbox("Altitude interval", ["10 m", "50 m", "100 m", "500 m"], index=1)
 bin_size_m = int(resolution.split()[0])
 average_folder = f"averaged_{bin_size_m}m"

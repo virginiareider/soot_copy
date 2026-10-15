@@ -57,25 +57,12 @@ def create_profile_figure(
                     mode="markers",
                     name=f"{title} bin means",
                     marker={"color": color, "size": marker_size, "symbol": marker_shape},
+                    zorder=5,
                     customdata=profile["Sample_Count"],
                     hovertemplate=(
                         "Altitude: %{y:.3f} km<br>Value: %{x:.4g}"
                         "<br>Source samples: %{customdata}<extra></extra>"
                     ),
-                ),
-                row=1,
-                col=column_index,
-            )
-        if show_smooth_curve and len(values) > 1:
-            smoothed = smooth_by_altitude(altitude_values, values, smoothing_sigma_km)
-            figure.add_trace(
-                go.Scatter(
-                    x=smoothed,
-                    y=altitude_values,
-                    mode="lines",
-                    name=f"{title} smooth",
-                    line={"color": line_color, "width": 3, "dash": curve_style},
-                    hovertemplate="Altitude: %{y:.3f} km<br>Smoothed: %{x:.4g}<extra></extra>",
                 ),
                 row=1,
                 col=column_index,
@@ -87,6 +74,24 @@ def create_profile_figure(
             row=1,
             col=column_index,
         )
+    if show_smooth_curve:
+        for column_index, column, _, title, _ in columns:
+            values = profile[column].to_numpy()
+            if len(values) > 1:
+                smoothed = smooth_by_altitude(altitude_values, values, smoothing_sigma_km)
+                figure.add_trace(
+                    go.Scatter(
+                        x=smoothed,
+                        y=altitude_values,
+                        mode="lines",
+                        name=f"{title} smooth",
+                        line={"color": line_color, "width": 3, "dash": curve_style},
+                        zorder=20,
+                        hovertemplate="Altitude: %{y:.3f} km<br>Smoothed: %{x:.4g}<extra></extra>",
+                    ),
+                    row=1,
+                    col=column_index,
+                )
     figure.update_yaxes(
         range=[altitude_limits[1], altitude_limits[0]] if reverse_altitude else list(altitude_limits),
         title_text="Altitude (km)",

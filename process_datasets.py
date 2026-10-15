@@ -22,6 +22,7 @@ class DatasetSpec:
     temperature_to_c: float = 0.0
     datetime_column: str | None = None
     minimum_altitude_km: float | None = None
+    temperature_range_c: tuple[float, float] | None = None
     unit_notes: str = "Source columns already use the output units."
 
 
@@ -31,9 +32,9 @@ DATASET_SPECS = {
         ozone_column="O3",
         temperature_column=None,
         altitude_to_km=1 / 1000,
-        ozone_to_ppmv=1,
+        ozone_to_ppmv=1 / 1000,
         datetime_column="Datetime",
-        unit_notes="G_Alt is in meters, converted to km; ozone is in ppmv; temperature is unavailable.",
+        unit_notes="G_Alt is in meters and O3 is in ppbv; both are converted to km and ppmv respectively. Temperature is unavailable.",
     ),
     "OWLETS_2017_SONDE_MCGEE.csv": DatasetSpec(
         altitude_column="Altitude_km",
@@ -68,6 +69,42 @@ DATASET_SPECS = {
         temperature_to_c=273.15,
         datetime_column="Datetime",
     ),
+    "STAQS_2023_SONDE_WALTER.csv": DatasetSpec(
+        altitude_column="Altitude_km",
+        ozone_column="Ozone_ppbv",
+        temperature_column="Temp_degC",
+        altitude_to_km=1,
+        ozone_to_ppmv=1 / 1000,
+        datetime_column="Seconds_Datetime",
+        unit_notes="Altitude is in km, ozone is converted from ppbv to ppmv, and temperature is in degC.",
+    ),
+    "STAQS_2023_SONDE_MCKINNEY.csv": DatasetSpec(
+        altitude_column="Altitude_km",
+        ozone_column="Ozone_ppmv",
+        temperature_column="Temp_degC",
+        altitude_to_km=1,
+        ozone_to_ppmv=1 / 1000,
+        datetime_column="Seconds_Datetime",
+        unit_notes="Altitude is in km; ozone values are in ppbv despite the source column label and are converted to ppmv; temperature is in degC.",
+    ),
+    "STAQS_2023_DRONE_NEWCHURCH.csv": DatasetSpec(
+        altitude_column="Altitude",
+        ozone_column="O3",
+        temperature_column="Temperature",
+        altitude_to_km=1 / 1000,
+        ozone_to_ppmv=1 / 1000,
+        datetime_column="Datetime_Start",
+        unit_notes="Altitude is in meters and ozone is in ppbv; both are converted to km and ppmv respectively. Temperature is in degC.",
+    ),
+    "AJAX_2019_SCI-AVIATION_IRACI.csv": DatasetSpec(
+        altitude_column="Alt",
+        ozone_column="O3",
+        temperature_column=None,
+        altitude_to_km=1 / 1000,
+        ozone_to_ppmv=1 / 1000,
+        datetime_column="Datetime",
+        unit_notes="Altitude is in meters and ozone is in ppbv; both are converted to km and ppmv. Temperature is unavailable for the valid ozone measurements.",
+    ),
 }
 
 ALTITUDE_CANDIDATES = ("Altitude_km", "Altitude", "G_Alt", "GPSAltitude_km")
@@ -88,7 +125,7 @@ def _first_present(columns: list[str], candidates: tuple[str, ...]) -> str:
 
 def _source_audit() -> pd.DataFrame:
     audit_rows = []
-    for path in sorted(SOURCE_DIR.glob("*.csv")):
+    for path in sorted(SOURCE_DIR.rglob("*.csv")):
         columns = pd.read_csv(path, nrows=0).columns.tolist()
         spec = DATASET_SPECS.get(path.name)
         altitude_column = spec.altitude_column if spec else _first_present(columns, ALTITUDE_CANDIDATES)
@@ -153,6 +190,8 @@ def _load_clean_dataset(path: Path, spec: DatasetSpec) -> pd.DataFrame:
     valid = np.isfinite(numeric).all(axis=1) & (cleaned["Ozone_ppmv"] > 0)
     if spec.minimum_altitude_km is not None:
         valid &= cleaned["Altitude_km"] >= spec.minimum_altitude_km
+    if spec.temperature_range_c is not None and "Air_Temperature_C" in cleaned.columns:
+        valid &= cleaned["Air_Temperature_C"].between(*spec.temperature_range_c)
 
     cleaned = cleaned.loc[valid].copy()
     if cleaned.empty:
@@ -198,9 +237,10 @@ def main() -> None:
     audit = _source_audit()
     audit.to_csv(OUTPUT_DIR / "source_audit.csv", index=False)
 
+    source_paths = {path.name: path for path in SOURCE_DIR.rglob("*.csv")}
     for filename, spec in DATASET_SPECS.items():
-        source_path = SOURCE_DIR / filename
-        if not source_path.exists():
+        source_path = source_paths.get(filename)
+        if source_path is None:
             raise FileNotFoundError(f"Expected source dataset not found: {source_path}")
 
         cleaned = _load_clean_dataset(source_path, spec)
