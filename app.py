@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+#edit pls 
 from visualizations.common import smooth_by_altitude
 from visualizations.profile_plot import create_profile_figure
 from visualizations.scatter_plot import (
@@ -17,7 +18,7 @@ PROJECT_DIR = Path(__file__).resolve().parent
 PROCESSED_DIR = PROJECT_DIR / "datasets" / "processed"
 CAMPAIGNS = [
     {
-        "location": "Chesapeake Bay region",
+        "location": "Chesapeake Bay",
         "season": "Summer",
         "label": "OWLETS 2017 · Sonde",
         "stem": "OWLETS_2017_SONDE_MCGEE",
@@ -48,18 +49,18 @@ CAMPAIGNS = [
     },
     {
         "location": "Multiple U.S. locations",
-        "season": "Spring-Fall 2023",
+        "season": "Summer 2023",
         "label": "STAQS 2023 · Walter sonde",
         "stem": "STAQS_2023_SONDE_WALTER",
     },
     {
-        "location": "Lake Michigan region",
+        "location": "Multiple U.S. locations",
         "season": "Summer 2023",
         "label": "STAQS 2023 · McKinney sonde",
         "stem": "STAQS_2023_SONDE_MCKINNEY",
     },
     {
-        "location": "STAQS study region",
+        "location": "Multiple U.S. locations",
         "season": "Summer 2023",
         "label": "STAQS 2023 · Newchurch drone",
         "stem": "STAQS_2023_DRONE_NEWCHURCH",
