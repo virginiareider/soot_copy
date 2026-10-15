@@ -3,5 +3,3 @@ pandas
 numpy
 matplotlib
 plotly
-requests
-scipy
