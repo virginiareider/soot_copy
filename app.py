@@ -4,6 +4,10 @@ import pandas as pd
 import streamlit as st
 
 #edit pls 
+from visualizations.all_data_plot import (
+    create_all_data_figure,
+    filter_data_by_date,
+)
 from visualizations.common import smooth_by_altitude
 from visualizations.profile_plot import create_profile_figure
 from visualizations.scatter_plot import (
@@ -36,13 +40,13 @@ CAMPAIGNS = [
         "stem": "AJAX_2018_ALPHA_IRACI",
     },
     {
-        "location": "Multiple U.S. locations",
+        "location": "Texas and Connecticut",
         "season": "Spring-Summer",
         "label": "STAQS 2023 · Walter sonde",
         "stem": "STAQS_2023_SONDE_WALTER",
     },
     {
-        "location": "Multiple U.S. locations",
+        "location": "Lake Michigan",
         "season": "Spring-Summer",
         "label": "STAQS 2023 · McKinney sonde",
         "stem": "STAQS_2023_SONDE_MCKINNEY",
@@ -59,6 +63,15 @@ CAMPAIGNS = [
 @st.cache_data(show_spinner=False)
 def load_dataset(dataset_path: Path) -> pd.DataFrame:
     return pd.read_csv(dataset_path)
+
+
+def slider_bounds(values: pd.Series, minimum_span: float) -> tuple[float, float]:
+    lower = float(values.min())
+    upper = float(values.max())
+    if lower >= upper:
+        padding = max(abs(lower) * 0.01, minimum_span / 2)
+        return lower - padding, upper + padding
+    return lower, upper
 
 
 st.title("NASA Ozone and Temperature Profiles")
@@ -124,6 +137,9 @@ dataset_path = (
 
 with st.spinner("Loading averaged profile..."):
     profile = load_dataset(dataset_path)
+source_data_path = PROCESSED_DIR / "cleaned" / f"{selected_campaign['stem']}_clean.csv"
+with st.spinner("Loading individual measurements..."):
+    source_data = load_dataset(source_data_path)
 
 required_columns = ["Altitude_km", "Ozone_ppmv"]
 has_temperature = "Air_Temperature_C" in profile.columns
@@ -140,8 +156,8 @@ st.caption(
 maximum_smoothing_m = max(100, min(2000, int(profile["Altitude_km"].max() * 1000)))
 maximum_smoothing_m = max(100, (maximum_smoothing_m // 100) * 100)
 with st.sidebar:
-    st.subheader("Profile style")
-    show_bin_means = st.checkbox("Show altitude-bin means", value=True)
+    st.subheader("Chart style")
+    show_bin_means = st.checkbox("Show altitude-bin means (Profiles)", value=True)
     show_smooth_curve = st.checkbox("Show smoothed curve", value=True)
     smoothing_span_m = st.slider(
         "Smoothing span (m)",
@@ -158,7 +174,7 @@ with st.sidebar:
     line_color = st.selectbox("Smooth line color", color_palette, index=1)
     marker_shape = st.selectbox(
         "Data marker shape",
-        ["circle", "square", "diamond", "triangle", "cross", "x", "star"],
+        ["circle", "square", "diamond", "triangle-up", "cross", "x", "star"],
     )
     marker_size = st.slider("Data marker size", min_value=3, max_value=14, value=6)
     curve_style = st.selectbox("Smooth curve style", ["solid", "dash", "dot", "dashdot"])
@@ -183,7 +199,36 @@ if has_temperature:
     temperature_min = float(profile["Air_Temperature_C"].min())
     temperature_max = float(profile["Air_Temperature_C"].max())
 
+source_dates = pd.to_datetime(source_data["Datetime"], errors="coerce").dropna()
+date_filtered_data = source_data.iloc[0:0].copy()
+if not source_dates.empty:
+    earliest_date = source_dates.min().date()
+    latest_date = source_dates.max().date()
+    with st.expander("Individual measurement date range", expanded=False):
+        selected_dates = st.date_input(
+            "Dates used by All measurements",
+            value=(earliest_date, latest_date),
+            min_value=earliest_date,
+            max_value=latest_date,
+            key=f"measurement_dates_{selected_campaign['stem']}",
+        )
+    if isinstance(selected_dates, (tuple, list)) and len(selected_dates) == 2:
+        start_date, end_date = selected_dates
+    else:
+        start_date = end_date = selected_dates
+    date_filtered_data = filter_data_by_date(source_data, start_date, end_date)
+
+axis_data = date_filtered_data if not date_filtered_data.empty else source_data
+all_altitude_min, all_altitude_max = slider_bounds(axis_data["Altitude_km"], 0.001)
+all_ozone_min, all_ozone_max = slider_bounds(axis_data["Ozone_ppmv"], 0.00001)
+all_temperature_limits = None
+if has_temperature:
+    all_temperature_min, all_temperature_max = slider_bounds(
+        axis_data["Air_Temperature_C"], 0.01
+    )
+
 with st.expander("Axis ranges", expanded=False):
+    st.subheader("Averaged profile")
     altitude_range, ozone_range = st.columns(2)
     altitude_limits = altitude_range.slider(
         "Altitude (km)",
@@ -211,6 +256,36 @@ with st.expander("Axis ranges", expanded=False):
             step=max((temperature_max - temperature_min) / 500, 0.01),
             format="%.1f",
         )
+    st.subheader("All measurements")
+    all_axis_columns = st.columns(3 if has_temperature else 2)
+    all_altitude_limits = all_axis_columns[0].slider(
+        "Altitude range (km)",
+        min_value=all_altitude_min,
+        max_value=all_altitude_max,
+        value=(all_altitude_min, all_altitude_max),
+        step=max((all_altitude_max - all_altitude_min) / 500, 0.001),
+        format="%.3f",
+        key=f"all_altitude_range_{selected_campaign['stem']}",
+    )
+    all_ozone_limits = all_axis_columns[1].slider(
+        "Ozone range (ppmv)",
+        min_value=all_ozone_min,
+        max_value=all_ozone_max,
+        value=(all_ozone_min, all_ozone_max),
+        step=max((all_ozone_max - all_ozone_min) / 500, 0.00001),
+        format="%.4f",
+        key=f"all_ozone_range_{selected_campaign['stem']}",
+    )
+    if has_temperature:
+        all_temperature_limits = all_axis_columns[2].slider(
+            "Temperature range (°C)",
+            min_value=all_temperature_min,
+            max_value=all_temperature_max,
+            value=(all_temperature_min, all_temperature_max),
+            step=max((all_temperature_max - all_temperature_min) / 500, 0.01),
+            format="%.1f",
+            key=f"all_temperature_range_{selected_campaign['stem']}",
+        )
 
 visible_profile = profile.loc[
     profile["Altitude_km"].between(*altitude_limits)
@@ -226,6 +301,7 @@ tab_labels = [
 ]
 if has_temperature:
     tab_labels.append("Temperature vs altitude")
+tab_labels.append("All measurements")
 tabs = st.tabs(tab_labels)
 
 with tabs[0]:
@@ -297,6 +373,77 @@ if has_temperature:
             tropopause_km,
         )
         st.plotly_chart(figure, width="stretch", config={"scrollZoom": True, "displaylogo": False})
+
+all_measurements_tab = 4 if has_temperature else 3
+with tabs[all_measurements_tab]:
+    st.caption(
+        "Dots are individual cleaned measurements from the selected date range. "
+        "Date and axis ranges filter both the measurements and summary statistics. "
+        "The curve is calculated from altitude-bin averages of the filtered measurements."
+    )
+    if date_filtered_data.empty:
+        st.warning("This dataset has no usable dates or no measurements in the selected date range.")
+    else:
+        filtered_measurements = date_filtered_data.loc[
+            date_filtered_data["Altitude_km"].between(*all_altitude_limits)
+            & date_filtered_data["Ozone_ppmv"].between(*all_ozone_limits)
+        ].copy()
+        if has_temperature:
+            filtered_measurements = filtered_measurements.loc[
+                filtered_measurements["Air_Temperature_C"].between(*all_temperature_limits)
+            ]
+
+        if filtered_measurements.empty:
+            st.warning("No measurements fall within the selected date and axis ranges.")
+        else:
+            st.caption(f"{len(filtered_measurements):,} measurements within selected filters")
+            ozone_stats = filtered_measurements["Ozone_ppmv"]
+            ozone_peak_index = ozone_stats.idxmax()
+            ozone_summary = st.columns(6)
+            ozone_summary[0].metric("Measurements", f"{len(filtered_measurements):,}")
+            ozone_summary[1].metric("Mean ozone", f"{ozone_stats.mean():.4g} ppmv")
+            ozone_summary[2].metric("Median ozone", f"{ozone_stats.median():.4g} ppmv")
+            ozone_summary[3].metric("Minimum ozone", f"{ozone_stats.min():.4g} ppmv")
+            ozone_summary[4].metric("Maximum ozone", f"{ozone_stats.max():.4g} ppmv")
+            ozone_summary[5].metric(
+                "Altitude at max",
+                f"{filtered_measurements.loc[ozone_peak_index, 'Altitude_km']:.3f} km",
+            )
+            if has_temperature:
+                temperature_stats = filtered_measurements["Air_Temperature_C"]
+                minimum_temperature_index = temperature_stats.idxmin()
+                temperature_summary = st.columns(5)
+                temperature_summary[0].metric("Mean temperature", f"{temperature_stats.mean():.1f} °C")
+                temperature_summary[1].metric("Median temperature", f"{temperature_stats.median():.1f} °C")
+                temperature_summary[2].metric("Minimum temperature", f"{temperature_stats.min():.1f} °C")
+                temperature_summary[3].metric("Maximum temperature", f"{temperature_stats.max():.1f} °C")
+                temperature_summary[4].metric(
+                    "Altitude at min temperature",
+                    f"{filtered_measurements.loc[minimum_temperature_index, 'Altitude_km']:.3f} km",
+                )
+
+            figure = create_all_data_figure(
+                filtered_measurements,
+                smoothing_span_m,
+                ozone_color,
+                temperature_color,
+                line_color,
+                marker_shape,
+                marker_size,
+                curve_style,
+                show_smooth_curve,
+                reverse_altitude,
+                show_tropopause,
+                tropopause_km,
+                all_ozone_limits,
+                all_altitude_limits,
+                all_temperature_limits,
+            )
+            st.plotly_chart(
+                figure,
+                width="stretch",
+                config={"scrollZoom": True, "displaylogo": False},
+            )
 
 with st.expander("Averaged profile data"):
     st.dataframe(visible_profile, width="stretch", hide_index=True)
