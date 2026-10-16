@@ -20,6 +20,7 @@ st.set_page_config(page_title="NASA Ozone Profiles", layout="wide")
 
 PROJECT_DIR = Path(__file__).resolve().parent
 PROCESSED_DIR = PROJECT_DIR / "datasets" / "processed"
+SOURCE_DIR = PROJECT_DIR / "datasets" / "Data_Nasa_Soot"
 CAMPAIGNS = [
     {
         "location": "Chesapeake Bay",
@@ -63,6 +64,11 @@ CAMPAIGNS = [
 @st.cache_data(show_spinner=False)
 def load_dataset(dataset_path: Path) -> pd.DataFrame:
     return pd.read_csv(dataset_path)
+
+
+@st.cache_data(show_spinner="Preparing original source CSV...")
+def load_source_bytes(source_path: Path) -> bytes:
+    return source_path.read_bytes()
 
 
 def slider_bounds(values: pd.Series, minimum_span: float) -> tuple[float, float]:
@@ -126,6 +132,18 @@ selected_campaign = next(
 )
 location = selected_campaign["location"]
 season = selected_campaign["season"]
+source_matches = list(SOURCE_DIR.rglob(f"{selected_campaign['stem']}.csv"))
+if source_matches:
+    original_source_path = source_matches[0]
+    st.download_button(
+        "Download original source CSV",
+        data=load_source_bytes(original_source_path),
+        file_name=original_source_path.name,
+        mime="text/csv",
+        help="Download the original, unprocessed campaign data file.",
+    )
+else:
+    st.warning(f"Original source CSV not found for {selected_campaign['label']}.")
 resolution = st.selectbox("Altitude interval", ["10 m", "50 m", "100 m", "500 m"], index=1)
 bin_size_m = int(resolution.split()[0])
 average_folder = f"averaged_{bin_size_m}m"
