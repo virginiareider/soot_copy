@@ -30,24 +30,6 @@ CAMPAIGNS = [
         "stem": "SCOAPE_2024_SONDE_STAUFFER",
     },
     {
-        "location": "North Atlantic",
-        "season": "Summer",
-        "label": "AJAX 2018 · Alpha",
-        "stem": "AJAX_2018_ALPHA_IRACI",
-    },
-    {
-        "location": "Lake Michigan",
-        "season": "Summer",
-        "label": "LMOS 2017 · SCI-AVIATION",
-        "stem": "LMOS_2017_SCI-AVIATION_CONLEY",
-    },
-    {
-        "location": "Maryland",
-        "season": "Summer",
-        "label": "Discover-AQ 2011 · Maryland",
-        "stem": "DISCOVERAQ_2011-MD_MERGE_MRG",
-    },
-    {
         "location": "Multiple U.S. locations",
         "season": "Summer 2023",
         "label": "STAQS 2023 · Walter sonde",
@@ -58,18 +40,6 @@ CAMPAIGNS = [
         "season": "Summer 2023",
         "label": "STAQS 2023 · McKinney sonde",
         "stem": "STAQS_2023_SONDE_MCKINNEY",
-    },
-    {
-        "location": "Multiple U.S. locations",
-        "season": "Summer 2023",
-        "label": "STAQS 2023 · Newchurch drone",
-        "stem": "STAQS_2023_DRONE_NEWCHURCH",
-    },
-    {
-        "location": "California and Nevada",
-        "season": "Spring-Summer 2019",
-        "label": "AJAX 2019 · SCI-AVIATION",
-        "stem": "AJAX_2019_SCI-AVIATION_IRACI",
     },
 ]
 
