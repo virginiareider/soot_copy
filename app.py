@@ -30,16 +30,28 @@ CAMPAIGNS = [
         "stem": "SCOAPE_2024_SONDE_STAUFFER",
     },
     {
+        "location": "California and Nevada",
+        "season": "Winter-Spring 2018",
+        "label": "AJAX 2018 · Alpha",
+        "stem": "AJAX_2018_ALPHA_IRACI",
+    },
+    {
         "location": "Multiple U.S. locations",
-        "season": "Summer",
+        "season": "Spring-Summer",
         "label": "STAQS 2023 · Walter sonde",
         "stem": "STAQS_2023_SONDE_WALTER",
     },
     {
         "location": "Multiple U.S. locations",
-        "season": "Summer",
+        "season": "Spring-Summer",
         "label": "STAQS 2023 · McKinney sonde",
         "stem": "STAQS_2023_SONDE_MCKINNEY",
+    },
+    {
+        "location": "California and Nevada",
+        "season": "Spring-Summer 2019",
+        "label": "AJAX 2019 · SCI-AVIATION",
+        "stem": "AJAX_2019_SCI-AVIATION_IRACI",
     },
 ]
 
