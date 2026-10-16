@@ -31,13 +31,13 @@ CAMPAIGNS = [
     },
     {
         "location": "Multiple U.S. locations",
-        "season": "Summer 2023",
+        "season": "Summer",
         "label": "STAQS 2023 · Walter sonde",
         "stem": "STAQS_2023_SONDE_WALTER",
     },
     {
         "location": "Multiple U.S. locations",
-        "season": "Summer 2023",
+        "season": "Summer",
         "label": "STAQS 2023 · McKinney sonde",
         "stem": "STAQS_2023_SONDE_MCKINNEY",
     },
