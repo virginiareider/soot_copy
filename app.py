@@ -58,6 +58,36 @@ CAMPAIGNS = [
         "label": "AJAX 2019 · SCI-AVIATION",
         "stem": "AJAX_2019_SCI-AVIATION_IRACI",
     },
+    {
+        "location": "Texas",
+        "season": "Summer",
+        "label": "SEAC4RS 2013 · Merge WAS",
+        "stem": "SEAC4RS_2013_MERGE_WAS",
+    },
+    {
+        "location": "Texas",
+        "season": "Summer",
+        "label": "SEAC4RS 2013 · Merge SAGAAERO",
+        "stem": "SEAC4RS_2013_MERGE_SAGAAERO",
+    },
+    {
+        "location": "Texas",
+        "season": "Summer",
+        "label": "SEAC4RS 2013 · Merge SAGAMC",
+        "stem": "SEAC4RS_2013_MERGE_SAGAMC",
+    },
+    {
+        "location": "NYC",
+        "season": "Spring",
+        "label": "LISTOS 2017 · UMD-AIRCRAFT",
+        "stem": "LISTOS_2017_UMD-AIRCRAFT_DICKERSON",
+    },
+        {
+        "location": "Lake Michigan",
+        "season": "Summer",
+        "label": "LMOS 2017 · UWEC-AUTO",
+        "stem": "LMOS_2017_UWEC-AUTO_CLEARY",
+    }
 ]
 
 

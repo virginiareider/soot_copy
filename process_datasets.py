@@ -66,7 +66,7 @@ DATASET_SPECS = {
         ozone_column="Ozone_ppmv",
         temperature_column="Temp_degC",
         altitude_to_km=1,
-        ozone_to_ppmv=1 / 1000,
+        ozone_to_ppmv=1,
         datetime_column="Seconds_Datetime",
         unit_notes="Altitude is in km; ozone values are in ppbv despite the source column label and are converted to ppmv; temperature is in degC.",
     ),
@@ -79,18 +79,70 @@ DATASET_SPECS = {
         datetime_column="Datetime",
         unit_notes="Altitude is in meters and ozone is in ppbv; both are converted to km and ppmv. Temperature is unavailable for the valid ozone measurements.",
     ),
+        "LISTOS_2017_UMD-AIRCRAFT_DICKERSON.csv": DatasetSpec(
+        altitude_column="ALTP",
+        ozone_column="O3_ppbv",
+        temperature_column='Temperature',
+        altitude_to_km=1 / 1000,
+        ozone_to_ppmv=1 / 1000,
+        datetime_column="Day_of_year",
+        temperature_to_c=273.15, 
+        unit_notes="Altitude is in meters and ozone is in ppbv; both are converted to km and ppmv. Temperature is unavailable for the valid ozone measurements.",
+    ),
+        "LMOS_2017_UWEC-AUTO_CLEARY.csv": DatasetSpec(
+        altitude_column="Altitude",
+        ozone_column="O3_ppb",
+        temperature_column=None,
+        altitude_to_km=1 / 1000,
+        ozone_to_ppmv=1 / 1000,
+        datetime_column="Start_Datetime",
+        temperature_to_c=0, 
+        unit_notes="Altitude is in meters and ozone is in ppbv; both are converted to km and ppmv. Temperature is unavailable for the valid ozone measurements.",
+    ),
+        "SEAC4RS_2013_MERGE_SAGAAERO.csv": DatasetSpec(
+        altitude_column="ALTP",
+        ozone_column="O3_ESRL",
+        temperature_column='TotalTemp',
+        altitude_to_km=1,
+        ozone_to_ppmv=1 / 1000,
+        datetime_column="Datetime",
+        temperature_to_c=273.15, 
+        unit_notes="Altitude is in meters and ozone is in ppbv; both are converted to km and ppmv. Temperature is unavailable for the valid ozone measurements.",
+    ),
+        "SEAC4RS_2013_MERGE_SAGAMC.csv": DatasetSpec(
+        altitude_column="ALTP",
+        ozone_column="O3_ESRL",
+        temperature_column='TotalTemp',
+        altitude_to_km=1,
+        ozone_to_ppmv=1 / 1000,
+        datetime_column="Datetime",
+        temperature_to_c=273.15, 
+        unit_notes="Altitude is in meters and ozone is in ppbv; both are converted to km and ppmv. Temperature is unavailable for the valid ozone measurements.",
+    ),
+        "SEAC4RS_2013_MERGE_WAS.csv": DatasetSpec(
+        altitude_column="ALTP",
+        ozone_column="O3_ESRL",
+        temperature_column='TotalTemp',
+        altitude_to_km=1,
+        ozone_to_ppmv=1 / 1000,
+        datetime_column="Datetime",
+        temperature_to_c=273.15, 
+        unit_notes="Altitude is in meters and ozone is in ppbv; both are converted to km and ppmv. Temperature is unavailable for the valid ozone measurements.",
+    ),
 }
 
-ALTITUDE_CANDIDATES = ("Altitude_km", "Altitude", "G_Alt", "GPSAltitude_km")
+ALTITUDE_CANDIDATES = ("Altitude_km", "Altitude", "G_Alt", "GPSAltitude_km", "ALTP")
 OZONE_CANDIDATES = (
     "Ozone_ppmv",
     "O3_ppbv",
+    "O#_ppb",
     "O3_ppb",
     "O3",
     "2b_o3",
     "M2_O3",
+    "O3_ESRL"
 )
-TEMPERATURE_CANDIDATES = ("Temp_degC", "Temperature", "Temp", "M2_T")
+TEMPERATURE_CANDIDATES = ("Temp_degC", "Temperature", "Temp", "M2_T", 'Temperature', 'TotalTemp')
 
 
 def _first_present(columns: list[str], candidates: tuple[str, ...]) -> str:
