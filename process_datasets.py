@@ -66,7 +66,7 @@ DATASET_SPECS = {
         ozone_column="Ozone_ppmv",
         temperature_column="Temp_degC",
         altitude_to_km=1,
-        ozone_to_ppmv=1,
+        ozone_to_ppmv=1/1000,
         datetime_column="Seconds_Datetime",
         unit_notes="Altitude is in km; ozone values are in ppbv despite the source column label and are converted to ppmv; temperature is in degC.",
     ),

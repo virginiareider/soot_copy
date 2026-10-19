@@ -36,7 +36,7 @@ CAMPAIGNS = [
     },
     {
         "location": "California and Nevada",
-        "season": "Winter-Spring 2018",
+        "season": "Winter-Spring",
         "label": "AJAX 2018 · Alpha",
         "stem": "AJAX_2018_ALPHA_IRACI",
     },
@@ -54,7 +54,7 @@ CAMPAIGNS = [
     },
     {
         "location": "California and Nevada",
-        "season": "Spring-Summer 2019",
+        "season": "Spring-Summer",
         "label": "AJAX 2019 · SCI-AVIATION",
         "stem": "AJAX_2019_SCI-AVIATION_IRACI",
     },
@@ -198,35 +198,35 @@ if not set(required_columns).issubset(profile.columns):
 st.caption(f"{selected_campaign['label']} · {location} · {season} · {resolution} bins")
 st.caption(
     "Dashed tropopause boundary separates the troposphere below from the stratosphere above. "
-    "Its height is adjustable because the real tropopause varies."
+    "Its height is adjustable because the real tropopause varies. add more description here"
 )
 
-maximum_smoothing_m = max(100, min(2000, int(profile["Altitude_km"].max() * 1000)))
-maximum_smoothing_m = max(100, (maximum_smoothing_m // 100) * 100)
+maximum_smoothing_m = max(10, min(2000, int(profile["Altitude_km"].max() * 1000)))
+maximum_smoothing_m = max(10, (maximum_smoothing_m // 100) * 100)
 with st.sidebar:
     st.subheader("Chart style")
-    show_bin_means = st.checkbox("Show altitude-bin means (Profiles)", value=True)
+    show_bin_means = st.checkbox("Show datapoints", value=True)
     show_smooth_curve = st.checkbox("Show smoothed curve", value=True)
     smoothing_span_m = st.slider(
-        "Smoothing span (m)",
-        min_value=100,
+        "Smooth Curve Level (m)",
+        min_value=10,
         max_value=maximum_smoothing_m,
-        value=min(500, maximum_smoothing_m),
-        step=100,
+        value=min(10, maximum_smoothing_m),
+        step=10,
     )
     color_palette = [
         "Teal", "Blue", "Green", "Orange", "Red", "Purple", "Brown", "Black",
     ]
     ozone_color = st.selectbox("Ozone point color", color_palette, index=0)
     temperature_color = st.selectbox("Temperature point color", color_palette, index=3)
-    line_color = st.selectbox("Smooth line color", color_palette, index=1)
+    line_color = st.selectbox("Line color", color_palette, index=1)
     marker_shape = st.selectbox(
-        "Data marker shape",
+        "Data point shape",
         ["circle", "square", "diamond", "triangle-up", "cross", "x", "star"],
     )
-    marker_size = st.slider("Data marker size", min_value=3, max_value=14, value=6)
-    curve_style = st.selectbox("Smooth curve style", ["solid", "dash", "dot", "dashdot"])
-    reverse_altitude = st.checkbox("Reverse altitude axis", value=False)
+    marker_size = st.slider("Data point size", min_value=3, max_value=14, value=6)
+    curve_style = st.selectbox("Line style", ["solid", "dash", "dot", "dashdot"])
+    reverse_altitude = st.checkbox("Reverse axis", value=False)
     show_tropopause = st.checkbox("Show tropopause boundary", value=True)
     tropopause_km = st.number_input(
         "Tropopause altitude (km)",
@@ -377,7 +377,7 @@ with tabs[0]:
     st.plotly_chart(figure, width="stretch", config={"scrollZoom": True, "displaylogo": False})
 
 with tabs[1]:
-    st.caption("Each violin shows the distribution of altitude-bin means for that variable.")
+    st.caption("Each violin shows the distribution of for that variable.")
     figure = create_violin_figure(
         visible_profile,
         altitude_limits,
@@ -427,7 +427,7 @@ with tabs[all_measurements_tab]:
     st.caption(
         "Dots are individual cleaned measurements from the selected date range. "
         "Date and axis ranges filter both the measurements and summary statistics. "
-        "The curve is calculated from altitude-bin averages of the filtered measurements."
+        "The curve is calculated from the filtered measurements."
     )
     if date_filtered_data.empty:
         st.warning("This dataset has no usable dates or no measurements in the selected date range.")

@@ -55,7 +55,7 @@ def create_profile_figure(
                     x=values,
                     y=altitude_values,
                     mode="markers",
-                    name=f"{title} bin means",
+                    name=f"{title} means",
                     marker={"color": color, "size": marker_size, "symbol": marker_shape},
                     zorder=5,
                     customdata=profile["Sample_Count"],
