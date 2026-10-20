@@ -432,32 +432,7 @@ if has_temperature:
 all_measurements_tab = 4 if has_temperature else 3
 with tabs[all_measurements_tab]:
 
-    if {"Latitude", "Longitude"}.issubset(source_data.columns):
 
-        st.subheader("Measurement Locations")
-
-        map_points = (
-            location_filtered_data[
-                ["Latitude", "Longitude"]
-            ]
-            .dropna()
-        )
-
-        if not map_points.empty:
-
-            st.caption(
-                f"{len(map_points):,} measurements with geographic coordinates"
-            )
-
-            st.map(
-                map_points.rename(
-                    columns={
-                        "Latitude": "lat",
-                        "Longitude": "lon",
-                    }
-                ),
-                use_container_width=True,
-            )
 
     st.caption(
         "Dots are individual cleaned measurements from the selected date range. "
@@ -480,6 +455,35 @@ with tabs[all_measurements_tab]:
             st.warning("No measurements fall within the selected date and axis ranges.")
         else:
             st.caption(f"{len(filtered_measurements):,} measurements within selected filters")
+            if (
+                not filtered_measurements.empty
+                and {"Latitude", "Longitude"}.issubset(filtered_measurements.columns)
+            ):
+
+                st.subheader("Measurement Locations")
+
+                map_points = (
+                    filtered_measurements[
+                        ["Latitude", "Longitude"]
+                    ]
+                    .dropna()
+                )
+
+                if not map_points.empty:
+
+                    st.caption(
+                        f"{len(map_points):,} measurements within selected filters"
+                    )
+
+                    st.map(
+                        map_points.rename(
+                            columns={
+                                "Latitude": "lat",
+                                "Longitude": "lon",
+                            }
+                        ),
+                        use_container_width=True,
+                    )
             ozone_stats = filtered_measurements["Ozone_ppmv"]
             ozone_peak_index = ozone_stats.idxmax()
             ozone_summary = st.columns(6)
