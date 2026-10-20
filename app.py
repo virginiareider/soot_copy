@@ -266,7 +266,71 @@ if not source_dates.empty:
         start_date = end_date = selected_dates
     date_filtered_data = filter_data_by_date(source_data, start_date, end_date)
 
-axis_data = date_filtered_data if not date_filtered_data.empty else source_data
+location_filtered_data = date_filtered_data.copy()
+
+if (
+    not location_filtered_data.empty
+    and {"Latitude", "Longitude"}.issubset(location_filtered_data.columns)
+):
+
+    with st.expander("Measurement locations", expanded=False):
+
+        map_points = (
+            location_filtered_data[
+                ["Latitude", "Longitude"]
+            ]
+            .dropna()
+            .drop_duplicates()
+            .reset_index(drop=True)
+        )
+
+        if not map_points.empty:
+
+            map_points["Location_ID"] = (
+                map_points["Latitude"].round(3).astype(str)
+                + ", "
+                + map_points["Longitude"].round(3).astype(str)
+            )
+
+            selected_locations = st.multiselect(
+                "Locations included in All Measurements",
+                options=map_points["Location_ID"].tolist(),
+                default=map_points["Location_ID"].tolist(),
+            )
+
+            st.caption(
+                f"{len(map_points):,} unique sampling locations"
+            )
+
+            st.map(
+                map_points.rename(
+                    columns={
+                        "Latitude": "lat",
+                        "Longitude": "lon",
+                    }
+                ),
+                use_container_width=True,
+            )
+
+            selected_map_points = map_points[
+                map_points["Location_ID"].isin(selected_locations)
+            ]
+
+            if not selected_map_points.empty:
+
+                location_filtered_data = location_filtered_data.merge(
+                    selected_map_points[
+                        ["Latitude", "Longitude"]
+                    ],
+                    on=["Latitude", "Longitude"],
+                    how="inner",
+                )
+
+axis_data = (
+    location_filtered_data
+    if not location_filtered_data.empty
+    else source_data
+)
 all_altitude_min, all_altitude_max = slider_bounds(axis_data["Altitude_km"], 0.001)
 all_ozone_min, all_ozone_max = slider_bounds(axis_data["Ozone_ppmv"], 0.00001)
 all_temperature_limits = None
@@ -429,12 +493,12 @@ with tabs[all_measurements_tab]:
         "Date and axis ranges filter both the measurements and summary statistics. "
         "The curve is calculated from the filtered measurements."
     )
-    if date_filtered_data.empty:
+    if location_filtered_data.empty:
         st.warning("This dataset has no usable dates or no measurements in the selected date range.")
     else:
-        filtered_measurements = date_filtered_data.loc[
-            date_filtered_data["Altitude_km"].between(*all_altitude_limits)
-            & date_filtered_data["Ozone_ppmv"].between(*all_ozone_limits)
+        filtered_measurements = location_filtered_data.loc[
+            location_filtered_data["Altitude_km"].between(*all_altitude_limits)
+            & location_filtered_data["Ozone_ppmv"].between(*all_ozone_limits)
         ].copy()
         if has_temperature:
             filtered_measurements = filtered_measurements.loc[

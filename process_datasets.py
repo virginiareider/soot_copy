@@ -21,6 +21,7 @@ class DatasetSpec:
     ozone_to_ppmv: float
     temperature_to_c: float = 0.0
     datetime_column: str | None = None
+
     minimum_altitude_km: float | None = None
     temperature_range_c: tuple[float, float] | None = None
     unit_notes: str = "Source columns already use the output units."
@@ -143,7 +144,28 @@ OZONE_CANDIDATES = (
     "O3_ESRL"
 )
 TEMPERATURE_CANDIDATES = ("Temp_degC", "Temperature", "Temp", "M2_T", 'Temperature', 'TotalTemp')
+LATITUDE_CANDIDATES = (
+    "Latitude",
+    "LAT",
+    "Lat",
+    "latitude",
+    "Latitude_deg",
+    "LATITUDE",
+    "G_LAT",
+    'G_Lat'
+)
 
+LONGITUDE_CANDIDATES = (
+    "Longitude",
+    'Longitude',
+    "LON",
+    "Lon",
+    "longitude",
+    "Longitude_deg",
+    "LONGITUDE",
+    "G_LONG",
+    'G_Long'
+)
 
 def _first_present(columns: list[str], candidates: tuple[str, ...]) -> str:
     return next((name for name in candidates if name in columns), "")
@@ -185,45 +207,113 @@ def _source_audit() -> pd.DataFrame:
         )
     return pd.DataFrame(audit_rows)
 
-
 def _load_clean_dataset(path: Path, spec: DatasetSpec) -> pd.DataFrame:
+    available_columns = pd.read_csv(path, nrows=0).columns.tolist()
+
+    latitude_column = _first_present(
+        available_columns,
+        LATITUDE_CANDIDATES,
+    )
+
+    longitude_column = _first_present(
+        available_columns,
+        LONGITUDE_CANDIDATES,
+    )
+
     columns = [spec.altitude_column, spec.ozone_column]
+
     if spec.temperature_column:
         columns.append(spec.temperature_column)
+
     if spec.datetime_column:
         columns.append(spec.datetime_column)
-    frame = pd.read_csv(path, usecols=columns, low_memory=False)
+
+    if latitude_column:
+        columns.append(latitude_column)
+
+    if longitude_column:
+        columns.append(longitude_column)
+
+    frame = pd.read_csv(
+        path,
+        usecols=columns,
+        low_memory=False,
+    )
 
     cleaned = pd.DataFrame(
         {
-            "Altitude_km": pd.to_numeric(frame[spec.altitude_column], errors="coerce")
-            * spec.altitude_to_km,
-            "Ozone_ppmv": pd.to_numeric(frame[spec.ozone_column], errors="coerce")
-            * spec.ozone_to_ppmv,
+            "Altitude_km": (
+                pd.to_numeric(
+                    frame[spec.altitude_column],
+                    errors="coerce",
+                )
+                * spec.altitude_to_km
+            ),
+            "Ozone_ppmv": (
+                pd.to_numeric(
+                    frame[spec.ozone_column],
+                    errors="coerce",
+                )
+                * spec.ozone_to_ppmv
+            ),
         }
     )
+
     if spec.temperature_column:
-        cleaned["Air_Temperature_C"] = pd.to_numeric(
-            frame[spec.temperature_column], errors="coerce"
-        ) - spec.temperature_to_c
+        cleaned["Air_Temperature_C"] = (
+            pd.to_numeric(
+                frame[spec.temperature_column],
+                errors="coerce",
+            )
+            - spec.temperature_to_c
+        )
+
     if spec.datetime_column:
         cleaned["Datetime"] = frame[spec.datetime_column]
 
+    if latitude_column:
+        cleaned["Latitude"] = pd.to_numeric(
+            frame[latitude_column],
+            errors="coerce",
+        )
+
+    if longitude_column:
+        cleaned["Longitude"] = pd.to_numeric(
+            frame[longitude_column],
+            errors="coerce",
+        )
+
     required = ["Altitude_km", "Ozone_ppmv"]
+
     if spec.temperature_column:
         required.append("Air_Temperature_C")
+
     numeric = cleaned[required].to_numpy(dtype=float)
-    valid = np.isfinite(numeric).all(axis=1) & (cleaned["Ozone_ppmv"] > 0)
+
+    valid = (
+        np.isfinite(numeric).all(axis=1)
+        & (cleaned["Ozone_ppmv"] > 0)
+    )
+
     if spec.minimum_altitude_km is not None:
         valid &= cleaned["Altitude_km"] >= spec.minimum_altitude_km
-    if spec.temperature_range_c is not None and "Air_Temperature_C" in cleaned.columns:
-        valid &= cleaned["Air_Temperature_C"].between(*spec.temperature_range_c)
+
+    if (
+        spec.temperature_range_c is not None
+        and "Air_Temperature_C" in cleaned.columns
+    ):
+        valid &= cleaned["Air_Temperature_C"].between(
+            *spec.temperature_range_c
+        )
 
     cleaned = cleaned.loc[valid].copy()
-    if cleaned.empty:
-        raise ValueError(f"No valid rows remain in {path.name}.")
-    return cleaned
 
+    if cleaned.empty:
+        raise ValueError(
+            f"No valid rows remain in {path.name}."
+        )
+
+    return cleaned
 
 def _average_by_altitude(cleaned: pd.DataFrame, bin_size_m: int) -> pd.DataFrame:
     altitude_bin = np.floor(cleaned["Altitude_km"] * 1000 / bin_size_m).astype("int64")
