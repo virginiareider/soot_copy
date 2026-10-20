@@ -186,6 +186,7 @@ dataset_path = (
 with st.spinner("Loading averaged profile..."):
     profile = load_dataset(dataset_path)
 source_data_path = PROCESSED_DIR / "cleaned" / f"{selected_campaign['stem']}_clean.csv"
+
 with st.spinner("Loading individual measurements..."):
     source_data = load_dataset(source_data_path)
 
@@ -267,64 +268,6 @@ if not source_dates.empty:
     date_filtered_data = filter_data_by_date(source_data, start_date, end_date)
 
 location_filtered_data = date_filtered_data.copy()
-
-if (
-    not location_filtered_data.empty
-    and {"Latitude", "Longitude"}.issubset(location_filtered_data.columns)
-):
-
-    with st.expander("Measurement locations", expanded=False):
-
-        map_points = (
-            location_filtered_data[
-                ["Latitude", "Longitude"]
-            ]
-            .dropna()
-            .drop_duplicates()
-            .reset_index(drop=True)
-        )
-
-        if not map_points.empty:
-
-            map_points["Location_ID"] = (
-                map_points["Latitude"].round(3).astype(str)
-                + ", "
-                + map_points["Longitude"].round(3).astype(str)
-            )
-
-            selected_locations = st.multiselect(
-                "Locations included in All Measurements",
-                options=map_points["Location_ID"].tolist(),
-                default=map_points["Location_ID"].tolist(),
-            )
-
-            st.caption(
-                f"{len(map_points):,} unique sampling locations"
-            )
-
-            st.map(
-                map_points.rename(
-                    columns={
-                        "Latitude": "lat",
-                        "Longitude": "lon",
-                    }
-                ),
-                use_container_width=True,
-            )
-
-            selected_map_points = map_points[
-                map_points["Location_ID"].isin(selected_locations)
-            ]
-
-            if not selected_map_points.empty:
-
-                location_filtered_data = location_filtered_data.merge(
-                    selected_map_points[
-                        ["Latitude", "Longitude"]
-                    ],
-                    on=["Latitude", "Longitude"],
-                    how="inner",
-                )
 
 axis_data = (
     location_filtered_data
@@ -488,6 +431,34 @@ if has_temperature:
 
 all_measurements_tab = 4 if has_temperature else 3
 with tabs[all_measurements_tab]:
+
+    if {"Latitude", "Longitude"}.issubset(source_data.columns):
+
+        st.subheader("Measurement Locations")
+
+        map_points = (
+            source_data[
+                ["Latitude", "Longitude"]
+            ]
+            .dropna()
+        )
+
+        if not map_points.empty:
+
+            st.caption(
+                f"{len(map_points):,} measurements with geographic coordinates"
+            )
+
+            st.map(
+                map_points.rename(
+                    columns={
+                        "Latitude": "lat",
+                        "Longitude": "lon",
+                    }
+                ),
+                use_container_width=True,
+            )
+
     st.caption(
         "Dots are individual cleaned measurements from the selected date range. "
         "Date and axis ranges filter both the measurements and summary statistics. "
