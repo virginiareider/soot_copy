@@ -437,7 +437,7 @@ with tabs[all_measurements_tab]:
         st.subheader("Measurement Locations")
 
         map_points = (
-            source_data[
+            location_filtered_data[
                 ["Latitude", "Longitude"]
             ]
             .dropna()
