@@ -15,6 +15,7 @@ from visualizations.scatter_plot import (
     create_temperature_scatter_figure,
 )
 from visualizations.violin_plot import create_violin_figure
+import plotly.express as px
 
 st.set_page_config(page_title="NASA Ozone Profiles", layout="wide")
 
@@ -81,18 +82,6 @@ CAMPAIGNS = [
         "season": "Spring",
         "label": "LISTOS 2017 · UMD-AIRCRAFT",
         "stem": "LISTOS_2017_UMD-AIRCRAFT_DICKERSON",
-    },
-        {
-        "location": "Lake Michigan",
-        "season": "Summer",
-        "label": "LMOS 2017 · UWEC-AUTO",
-        "stem": "LMOS_2017_UWEC-AUTO_CLEARY",
-    },
-        {
-        "location": "Colorado",
-        "season": "Summer",
-        "label": "Discover-AQ 2014 · Merge",
-        "stem": "DISCOVERAQ_2014-CO_MERGE_MRG",
     },
      {
         "location": "Colorado",
@@ -186,7 +175,7 @@ if source_matches:
     )
 else:
     st.warning(f"Original source CSV not found for {selected_campaign['label']}.")
-resolution = st.selectbox("Altitude interval", ["10 m", "50 m", "100 m", "500 m"], index=1)
+resolution = st.selectbox("Altitude interval", ["10 m", "50 m", "100 m", "500 m"], index=0)
 bin_size_m = int(resolution.split()[0])
 average_folder = f"averaged_{bin_size_m}m"
 dataset_path = (
@@ -224,7 +213,7 @@ with st.sidebar:
         "Smooth Curve Level (m)",
         min_value=10,
         max_value=maximum_smoothing_m,
-        value=min(10, maximum_smoothing_m),
+        value=min(100, maximum_smoothing_m),
         step=10,
     )
     color_palette = [
@@ -245,7 +234,7 @@ with st.sidebar:
         "Tropopause altitude (km)",
         min_value=5.0,
         max_value=20.0,
-        value=12.0,
+        value=15.0,
         step=0.5,
         disabled=not show_tropopause,
     )
@@ -487,14 +476,38 @@ with tabs[all_measurements_tab]:
                         f"{len(map_points):,} measurements within selected filters"
                     )
 
-                    st.map(
-                        map_points.rename(
-                            columns={
-                                "Latitude": "lat",
-                                "Longitude": "lon",
-                            }
-                        ),
+                    map_points = filtered_measurements[
+                        ["Latitude", "Longitude", "Altitude_km"]
+                    ].dropna()
+
+                    map_points = filtered_measurements[
+                        ["Latitude", "Longitude", "Altitude_km"]
+                    ].dropna()
+
+                    map_fig = px.scatter_map(
+                        map_points,
+                        lat="Latitude",
+                        lon="Longitude",
+                        color="Altitude_km",
+                        color_continuous_scale="Viridis",
+                        zoom=4,
+                        height=500,
+                        hover_data={
+                            "Altitude_km": ":.3f",
+                            "Latitude": ":.3f",
+                            "Longitude": ":.3f",
+                        },
+                    )
+
+                    map_fig.update_layout(
+                        margin=dict(l=0, r=0, t=0, b=0),
+                        coloraxis_colorbar_title="Altitude (km)",
+                    )
+
+                    st.plotly_chart(
+                        map_fig,
                         use_container_width=True,
+                        config={"displaylogo": False},
                     )
             ozone_stats = filtered_measurements["Ozone_ppmv"]
             ozone_peak_index = ozone_stats.idxmax()
