@@ -477,11 +477,7 @@ with tabs[all_measurements_tab]:
                     )
 
                     map_points = filtered_measurements[
-                        ["Latitude", "Longitude", "Altitude_km"]
-                    ].dropna()
-
-                    map_points = filtered_measurements[
-                        ["Latitude", "Longitude", "Altitude_km"]
+                        ["Latitude", "Longitude", "Altitude_km", "Datetime"]
                     ].dropna()
 
                     map_fig = px.scatter_map(
@@ -496,6 +492,7 @@ with tabs[all_measurements_tab]:
                             "Altitude_km": ":.3f",
                             "Latitude": ":.3f",
                             "Longitude": ":.3f",
+                            'Datetime': True,
                         },
                     )
 
