@@ -92,13 +92,13 @@ CAMPAIGNS = [
         "location": "Colorado",
         "season": "Summer",
         "label": "Discover-AQ 2014 · Merge",
-        "stem": "DISCOVERAQ_2014-CO_2014_MERGE_MRG",
+        "stem": "DISCOVERAQ_2014-CO_MERGE_MRG",
     },
      {
         "location": "Colorado",
         "season": "Summer",
         "label": "Discover-AQ 2014 · Sonde ",
-        "stem": "DISCOVERAQ_2014-CO_2014_SONDE_THOMPSON",
+        "stem": "DISCOVERAQ_2014-CO_SONDES_THOMPSON",
     },
 ]
 
