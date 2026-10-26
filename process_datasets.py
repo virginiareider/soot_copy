@@ -130,6 +130,25 @@ DATASET_SPECS = {
         temperature_to_c=273.15, 
         unit_notes="Altitude is in meters and ozone is in ppbv; both are converted to km and ppmv. Temperature is unavailable for the valid ozone measurements.",
     ),
+        "DISCOVERAQ_2014-CO_SONDES_THOMPSON.csv": DatasetSpec(
+        altitude_column="Altitude_km",
+        ozone_column="Ozone_ppmv",
+        temperature_column="Temp_degC",
+        altitude_to_km=1,
+        ozone_to_ppmv=1,
+        datetime_column="Seconds_Datetime",
+        unit_notes="Altitude is in meters and ozone is in ppbv; both are converted to km and ppmv. Temperature is unavailable for the valid ozone measurements.",
+    ),
+        "DISCOVERAQ_2014-CO_MERGE_MRG.csv": DatasetSpec(
+        altitude_column="ALTP",
+        ozone_column="O3COLUMN",
+        temperature_column='TEMPERATURE',
+        altitude_to_km=1,
+        ozone_to_ppmv=1/1000,
+        datetime_column="Datetime",
+        temperature_to_c=273.15, 
+        unit_notes="Altitude is in meters and ozone is in ppbv; both are converted to km and ppmv. Temperature is unavailable for the valid ozone measurements.",
+    ),
 }
 
 ALTITUDE_CANDIDATES = ("Altitude_km", "Altitude", "G_Alt", "GPSAltitude_km", "ALTP")

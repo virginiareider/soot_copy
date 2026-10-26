@@ -87,7 +87,19 @@ CAMPAIGNS = [
         "season": "Summer",
         "label": "LMOS 2017 · UWEC-AUTO",
         "stem": "LMOS_2017_UWEC-AUTO_CLEARY",
-    }
+    },
+        {
+        "location": "Colorado",
+        "season": "Summer",
+        "label": "Discover-AQ 2014 · Merge",
+        "stem": "DISCOVERAQ_2014-CO_2014_MERGE_MRG",
+    },
+     {
+        "location": "Colorado",
+        "season": "Summer",
+        "label": "Discover-AQ 2014 · Sonde ",
+        "stem": "DISCOVERAQ_2014-CO_2014_SONDE_THOMPSON",
+    },
 ]
 
 
