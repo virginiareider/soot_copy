@@ -1,1 +1,1 @@
--- update read me, names, who it for, etc
+[NASA Profiles Dashboard Instructions (PDF)](datasets/Data_Nasa_Soot/Nasa%20Profiles%20Dashboard%20Instructions.pdf)
