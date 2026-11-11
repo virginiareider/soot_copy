@@ -1,9 +1,8 @@
-import base64
 from pathlib import Path
 
 import pandas as pd
+import pymupdf
 import streamlit as st
-import streamlit.components.v1 as components
 
 #edit pls 
 from visualizations.all_data_plot import (
@@ -26,6 +25,15 @@ PROCESSED_DIR = PROJECT_DIR / "datasets" / "processed"
 SOURCE_DIR = PROJECT_DIR / "datasets" / "Data_Nasa_Soot"
 INSTRUCTIONS_PDF = SOURCE_DIR / "Nasa Profiles Dashboard Instructions.pdf"
 
+
+@st.cache_data(show_spinner=False)
+def load_instruction_pages(pdf_path: Path) -> tuple[bytes, ...]:
+    document = pymupdf.open(stream=pdf_path.read_bytes(), filetype="pdf")
+    return tuple(
+        page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), alpha=False).tobytes("png")
+        for page in document
+    )
+
 if "dashboard_entered" not in st.session_state:
     st.session_state.dashboard_entered = False
 if "show_instructions" not in st.session_state:
@@ -34,14 +42,8 @@ if "show_instructions" not in st.session_state:
 if st.session_state.show_instructions:
     st.title("NASA Ozone Profiles · Instructions")
     if INSTRUCTIONS_PDF.exists():
-        encoded_pdf = base64.b64encode(INSTRUCTIONS_PDF.read_bytes()).decode("ascii")
-        components.html(
-            f'<iframe src="data:application/pdf;base64,{encoded_pdf}" '
-            'width="100%" height="760" type="application/pdf" '
-            'style="border: 1px solid #d5d9de; border-radius: 4px;"></iframe>',
-            height=780,
-            scrolling=False,
-        )
+        for page_number, page_image in enumerate(load_instruction_pages(INSTRUCTIONS_PDF), start=1):
+            st.image(page_image, caption=f"Instructions · page {page_number}", width="stretch")
         st.download_button(
             "Download instructions PDF",
             data=INSTRUCTIONS_PDF.read_bytes(),
