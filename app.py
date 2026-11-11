@@ -1,7 +1,9 @@
+import base64
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 #edit pls 
 from visualizations.all_data_plot import (
@@ -22,6 +24,38 @@ st.set_page_config(page_title="NASA Ozone Profiles", layout="wide")
 PROJECT_DIR = Path(__file__).resolve().parent
 PROCESSED_DIR = PROJECT_DIR / "datasets" / "processed"
 SOURCE_DIR = PROJECT_DIR / "datasets" / "Data_Nasa_Soot"
+INSTRUCTIONS_PDF = SOURCE_DIR / "Nasa Profiles Dashboard Instructions.pdf"
+
+if "dashboard_entered" not in st.session_state:
+    st.session_state.dashboard_entered = False
+if "show_instructions" not in st.session_state:
+    st.session_state.show_instructions = True
+
+if st.session_state.show_instructions:
+    st.title("NASA Ozone Profiles · Instructions")
+    if INSTRUCTIONS_PDF.exists():
+        encoded_pdf = base64.b64encode(INSTRUCTIONS_PDF.read_bytes()).decode("ascii")
+        components.html(
+            f'<iframe src="data:application/pdf;base64,{encoded_pdf}" '
+            'width="100%" height="760" type="application/pdf" '
+            'style="border: 1px solid #d5d9de; border-radius: 4px;"></iframe>',
+            height=780,
+            scrolling=False,
+        )
+        st.download_button(
+            "Download instructions PDF",
+            data=INSTRUCTIONS_PDF.read_bytes(),
+            file_name=INSTRUCTIONS_PDF.name,
+            mime="application/pdf",
+        )
+    else:
+        st.error(f"Instructions PDF not found: {INSTRUCTIONS_PDF.name}")
+    if st.button("Enter dashboard", type="primary", disabled=not INSTRUCTIONS_PDF.exists()):
+        st.session_state.dashboard_entered = True
+        st.session_state.show_instructions = False
+        st.rerun()
+    st.stop()
+
 CAMPAIGNS = [
     {
         "location": "Chesapeake Bay",
@@ -112,6 +146,9 @@ def slider_bounds(values: pd.Series, minimum_span: float) -> tuple[float, float]
 
 
 st.title("NASA Ozone and Temperature Profiles")
+if st.sidebar.button("View dashboard instructions"):
+    st.session_state.show_instructions = True
+    st.rerun()
 
 available_campaigns = [
     campaign
